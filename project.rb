@@ -6,6 +6,11 @@ class Strategy
 		@level = level
 		@crushed = crushed
 	end
+	
+	# For string representation
+	def to_s
+		"Egg dropped at floor #{@level} and #{@crushed ? '' : 'not '}crushed."
+	end
 end
 
 $MAX = 10000000000000000
@@ -31,7 +36,7 @@ end
 def find_strategy(numFloors, numEggs, floorOffset)
 	# if there are not floors, no trials required, or if 1 floor, 1 trials required
 	if numFloors == 1
-		return {'cost'=> 1, 'strategy'=> [floorOffset+1]}
+		return {'cost'=> 1, 'strategy'=> [Strategy.new(floorOffset+1, TRUE)]}
 	elsif numFloors == 0
 		return 	{'cost'=> 0, 'strategy'=> []}
 	end
@@ -40,7 +45,7 @@ def find_strategy(numFloors, numEggs, floorOffset)
 	if numEggs == 1
 		strategy = []
 		for i in 1..numFloors do
-			strategy << floorOffset + i
+			strategy << Strategy.new(floorOffset+i, TRUE)
 		end
 		return 	{'cost'=> numFloors, 'strategy'=> strategy}
 	end
@@ -53,12 +58,14 @@ def find_strategy(numFloors, numEggs, floorOffset)
 		not_crushed = find_strategy(numFloors-i, numEggs, floorOffset+i)
 		if not_crushed['cost'] > crushed['cost']
 			res = not_crushed
+			crushed = FALSE
 		else
 		    res = crushed
+			crushed = TRUE
 		end
 		if res['cost'] < min_strategy['cost']
 			min_strategy = res 
-			min_strategy['strategy'] = [floorOffset+i] + min_strategy['strategy']
+			min_strategy['strategy'] = [Strategy.new(floorOffset+i, crushed)] + min_strategy['strategy']
 		end
 	end
 	
