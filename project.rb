@@ -36,7 +36,7 @@ end
 def find_strategy(numFloors, numEggs, floorOffset)
 	# if there are not floors, no trials required, or if 1 floor, 1 trials required
 	if numFloors == 1
-		return {'cost'=> 1, 'strategy'=> [Strategy.new(floorOffset+1, TRUE)]}
+		return {'cost'=> 1, 'strategy'=> [Strategy.new(floorOffset+1, FALSE)]}
 	elsif numFloors == 0
 		return 	{'cost'=> 0, 'strategy'=> []}
 	end
@@ -45,7 +45,7 @@ def find_strategy(numFloors, numEggs, floorOffset)
 	if numEggs == 1
 		strategy = []
 		for i in 1..numFloors do
-			strategy << Strategy.new(floorOffset+i, TRUE)
+			strategy << Strategy.new(floorOffset+i, FALSE)
 		end
 		return 	{'cost'=> numFloors, 'strategy'=> strategy}
 	end
@@ -115,4 +115,4 @@ def max_trials_dp(numFloors, numEggs)
 	mem[numEggs][numFloors]
 end
 
-puts get_bf_strategy(10, 2)
+puts get_bf_strategy(20, 3)
