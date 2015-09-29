@@ -28,13 +28,13 @@ class Node
 		"Egg dropped at floor #{@level}"
 	end
 	
-	def self.print(root) 
+	def self.print(root, filename="decision_tree") 
 		g = ::GraphViz.new( :G, :type => :digraph )
 		
 		Node.draw_nodes(root, g)
 
 		# Generate output image
-		g.output( :png => "decision_tree.png" )	
+		g.output( :png => "#{filename}.png" )	
 	end
 	
 	private 
@@ -161,8 +161,8 @@ def output_decision_tree(numFloors, numEggs, floorOffset)
 	min_strategy
 end
 
-def print_decision_tree(numFloors, numEggs)
-	Node.print(output_decision_tree(numFloors, numEggs, 0)['root'])
+def print_decision_tree(numFloors, numEggs, filename="decision_tree")
+	Node.print(output_decision_tree(numFloors, numEggs, 0)['root'], filename)
 end
 
 def max_trials_dp(numFloors, numEggs)
@@ -279,4 +279,66 @@ def get_dp_strategy(numFloors, numEggs)
 	strategy
 end
 
-Node.print(output_decision_tree(20, 2, 0)['root'])
+def print_dp_decision_tree(numFloors, numEggs)
+	# A 2D table where entery eggFloor[i][j] will represent minimum
+	#   number of trials needed for i eggs and j floors.
+	mem = []
+	for i in 0..numEggs do
+		mem << []
+		for j in 0..numFloors do
+			mem[i] << { 'cost' => $MAX }
+		end
+	end
+ 
+	# We need one trial for one floor and0 trials for 0 floors
+	for i in 1..numEggs do
+		mem[i][1] = { 'cost' => 1 };
+		mem[i][0] = { 'cost' => 0 };
+	end 
+ 
+ 	# We always need j trials for one egg and j floors.
+	for j in 1..numFloors
+		mem[1][j] = { 'cost' => j };
+ 	end
+
+	# Fill rest of the entries in table using optimal substructure
+	# property
+	for i in 2..numEggs
+		for j in 2..numFloors
+			mem[i][j] = { 'cost' => $MAX }
+			for x in 1..j do
+				if mem[i-1][x-1]['cost'] > mem[i][j-x]['cost']
+					cost = mem[i-1][x-1]['cost'] + 1
+				else
+				 	cost = mem[i][j-x]['cost'] + 1
+				end
+				
+				if cost <= mem[i][j]['cost']
+					mem[i][j] = { 'cost' => cost, 
+					'offset' => x, 'crushed' => mem[i-1][x-1], 'not_crushed' => mem[i][j-x]}
+				end
+			end
+		end
+	end
+ 
+	# mem[numEggs][numFloors] holds the result
+	# But need to process the level in the result
+	retrieve_node(mem[numEggs][numFloors], 0)	
+end
+
+def retrieve_node(table_node, curOffset)
+	if table_node['offset']
+		crushed = retrieve_node(table_node['crushed'], curOffset)
+		not_crushed = retrieve_node(table_node['not_crushed'], curOffset+table_node['offset'])
+		Node.new(curOffset+table_node['offset'], crushed, not_crushed)
+	else
+		pnode = nil
+		for i in table_node['cost'].downto(1)
+			node = Node.new(curOffset+i, nil, pnode)
+			pnode = node
+		end
+		node
+	end
+end
+
+Node.print(print_dp_decision_tree(100, 2))
