@@ -2,7 +2,7 @@
 
 class Strategy
 	attr_accessor :level, :crushed
-	def initialize(level, crushed)
+	def initialize(level, crushed=nil)
 		@level = level
 		@crushed = crushed
 	end
@@ -115,4 +115,80 @@ def max_trials_dp(numFloors, numEggs)
 	mem[numEggs][numFloors]
 end
 
-puts get_bf_strategy(20, 3)
+def get_dp_strategy(numFloors, numEggs)
+	# A 2D table where entery eggFloor[i][j] will represent minimum
+	#   number of trials needed for i eggs and j floors.
+	mem = []
+	for i in 0..numEggs do
+		mem << []
+		for j in 0..numFloors do
+			mem[i] << { 'cost' => $MAX }
+		end
+	end
+ 
+	# We need one trial for one floor and0 trials for 0 floors
+	for i in 1..numEggs do
+		mem[i][1] = { 'cost' => 1 };
+		mem[i][0] = { 'cost' => 0 };
+	end 
+ 
+ 	# We always need j trials for one egg and j floors.
+	for j in 1..numFloors
+		mem[1][j] = { 'cost' => j };
+ 	end
+
+	# Fill rest of the entries in table using optimal substructure
+	# property
+	for i in 2..numEggs
+		for j in 2..numFloors
+			mem[i][j] = { 'cost' => $MAX }
+			for x in 1..j do
+				if mem[i-1][x-1]['cost'] > mem[i][j-x]['cost']
+					res = mem[i-1][x-1].clone
+					prev = [i-1, x-1]
+				else
+					res = mem[i][j-x].clone
+					prev = [i, j-x]
+				end
+				res['cost'] = res['cost'] + 1
+				if res['cost'] < mem[i][j]['cost']
+					mem[i][j] = res
+					mem[i][j]['prev'] = prev
+				end
+			end
+		end
+	end
+ 
+	# mem[numEggs][numFloors] holds the result
+	fin = mem[numEggs][numFloors]
+	p fin
+	curEggs = numEggs
+	curFloors = numFloors
+	floorOffset = 0
+	floorCeiling = numFloors
+	strategy = []
+	
+	while !fin['prev'].nil?
+		floorDiff =  curFloors - fin['prev'][1]
+		if fin['prev'][0] == curEggs
+			floorOffset += floorDiff
+			strategy << Strategy.new(floorOffset, FALSE)
+		else
+			floorCeiling = floorCeiling - floorDiff + 1
+			strategy << Strategy.new(floorCeiling, TRUE)
+		end
+		curFloors = fin['prev'][1]
+		curEggs = fin['prev'][0]
+		fin = mem[fin['prev'][0]][fin['prev'][1]]	
+		p fin
+	end
+	
+	# The egg should has been dropped at level floorOffset
+	for i in 1..fin['cost']
+		strategy << Strategy.new(floorOffset+i, FALSE)
+	end
+
+	strategy
+end
+
+puts get_dp_strategy(100, 2)
