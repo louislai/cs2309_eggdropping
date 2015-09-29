@@ -1,4 +1,6 @@
 #!/usr/bin/ruby
+require "ruby-graphviz"
+require "awesome_print"
 
 class Strategy
 	attr_accessor :level, :crushed
@@ -10,6 +12,47 @@ class Strategy
 	# For string representation
 	def to_s
 		"Egg dropped at floor #{@level} and #{@crushed ? '' : 'not '}crushed."
+	end
+end
+
+class Node
+	attr_accessor :level, :crushed_node, :not_crushed_node
+	def initialize(level, crushed_node=nil, not_crushed_node=nil)
+		@level = level
+		@crushed_node = crushed_node
+		@not_crushed_node = not_crushed_node
+	end
+	
+	# For string representation
+	def to_s
+		"Egg dropped at floor #{@level}"
+	end
+	
+	def self.print(root) 
+		g = ::GraphViz.new( :G, :type => :digraph )
+		
+		Node.draw_nodes(root, g)
+
+		# Generate output image
+		g.output( :png => "decision_tree.png" )	
+	end
+	
+	private 
+	def self.draw_nodes(node, graph)
+		parent = graph.add_nodes(node.level.to_s)
+	
+		# Create two nodes
+		if node.not_crushed_node
+			not_crushed = Node.draw_nodes(node.not_crushed_node, graph)
+			graph.add_edges(parent, not_crushed, label: 'not crushed')
+		end
+		
+		if node.crushed_node
+			crushed = Node.draw_nodes(node.crushed_node, graph)
+			graph.add_edges(parent, crushed, label: 'crushed')
+	 	end
+
+		parent
 	end
 end
 
@@ -75,6 +118,51 @@ end
 
 def get_bf_strategy(numFloors, numEggs)
 	find_strategy(numFloors, numEggs, 0)['strategy']
+end
+
+def output_decision_tree(numFloors, numEggs, floorOffset)
+	# if there are not floors, no trials required, or if 1 floor, 1 trials required
+	if numFloors == 1
+		return {'cost'=> 1, 'root' => Node.new(floorOffset+1)}
+	elsif numFloors == 0
+		return 	{'cost'=> 0, 'root'=> nil}
+	end
+	
+	# For 1 egg, we need numFloors trial
+	if numEggs == 1
+		tree = []
+		pnode = nil
+		for i in numFloors.downto(1) do
+			node = Node.new(floorOffset+i, nil, pnode)
+			pnode = node
+		end
+		return 	{'cost'=> numFloors, 'root'=> node}
+	end
+	
+	min_strategy = {'cost'=> $MAX}
+	
+	# Consider all droppings from 1st floor to kth floor and return min of these + 1 (this floor)
+	for i in 1..numFloors do
+		crushed = output_decision_tree(i-1, numEggs-1, floorOffset)
+		not_crushed = output_decision_tree(numFloors-i, numEggs, floorOffset+i)
+		if not_crushed['cost'] > crushed['cost']
+			res = not_crushed
+		else
+		    res = crushed
+		end
+		if res['cost'] < min_strategy['cost']
+			node = Node.new(floorOffset+i, crushed['root'], not_crushed['root'])
+			min_strategy['cost'] = res['cost'] 
+			min_strategy['root'] = node
+		end
+	end
+	
+	min_strategy['cost'] = min_strategy['cost']+1
+	min_strategy
+end
+
+def print_decision_tree(numFloors, numEggs)
+	Node.print(output_decision_tree(numFloors, numEggs, 0)['root'])
 end
 
 def max_trials_dp(numFloors, numEggs)
@@ -191,4 +279,4 @@ def get_dp_strategy(numFloors, numEggs)
 	strategy
 end
 
-puts get_dp_strategy(100, 2)
+Node.print(output_decision_tree(20, 2, 0)['root'])
