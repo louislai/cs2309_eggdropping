@@ -279,7 +279,7 @@ def get_dp_strategy(numFloors, numEggs)
 	strategy
 end
 
-def print_dp_decision_tree(numFloors, numEggs)
+def print_dp_decision_tree(numFloors, numEggs, filename="decision_tree")
 	# A 2D table where entery eggFloor[i][j] will represent minimum
 	#   number of trials needed for i eggs and j floors.
 	mem = []
@@ -292,13 +292,13 @@ def print_dp_decision_tree(numFloors, numEggs)
  
 	# We need one trial for one floor and0 trials for 0 floors
 	for i in 1..numEggs do
-		mem[i][1] = { 'cost' => 1 };
-		mem[i][0] = { 'cost' => 0 };
+		mem[i][1] = { 'cost' => 1, 'floorsLeft' => 1 };
+		mem[i][0] = { 'cost' => 0, 'floorsLeft' => 0 };
 	end 
  
  	# We always need j trials for one egg and j floors.
 	for j in 1..numFloors
-		mem[1][j] = { 'cost' => j };
+		mem[1][j] = { 'cost' => j, 'floorsLeft' => j };
  	end
 
 	# Fill rest of the entries in table using optimal substructure
@@ -307,11 +307,7 @@ def print_dp_decision_tree(numFloors, numEggs)
 		for j in 2..numFloors
 			mem[i][j] = { 'cost' => $MAX }
 			for x in 1..j do
-				if mem[i-1][x-1]['cost'] > mem[i][j-x]['cost']
-					cost = mem[i-1][x-1]['cost'] + 1
-				else
-				 	cost = mem[i][j-x]['cost'] + 1
-				end
+				cost = [mem[i][j-x]['cost'], mem[i-1][x-1]['cost']].max + 1
 				
 				if cost <= mem[i][j]['cost']
 					mem[i][j] = { 'cost' => cost, 
@@ -323,7 +319,7 @@ def print_dp_decision_tree(numFloors, numEggs)
  
 	# mem[numEggs][numFloors] holds the result
 	# But need to process the level in the result
-	retrieve_node(mem[numEggs][numFloors], 0)	
+	Node.print(retrieve_node(mem[numEggs][numFloors], 0), filename)	
 end
 
 def retrieve_node(table_node, curOffset)
@@ -333,7 +329,7 @@ def retrieve_node(table_node, curOffset)
 		Node.new(curOffset+table_node['offset'], crushed, not_crushed)
 	else
 		pnode = nil
-		for i in table_node['cost'].downto(1)
+		for i in table_node['floorsLeft'].downto(1)
 			node = Node.new(curOffset+i, nil, pnode)
 			pnode = node
 		end
@@ -341,4 +337,331 @@ def retrieve_node(table_node, curOffset)
 	end
 end
 
-Node.print(print_dp_decision_tree(100, 2))
+def output_gamestate_crush_status(startFloor, endFloor, numEggs, chosenFloor)
+	if chosenFloor < startFloor
+		return 'not crushed'
+	elsif chosenFloor > endFloor
+		return 'crushed'
+	else
+		numFloors = endFloor-startFloor
+		# Calculate dp table
+		# A 2D table where entery eggFloor[i][j] will represent minimum
+		#   number of trials needed for i eggs and j floors.
+		mem = []
+		for i in 0..numEggs do
+			mem << []
+			for j in 0..numFloors do
+				mem[i] << $MAX
+			end
+		end
+	 
+		# We need one trial for one floor and0 trials for 0 floors
+		for i in 1..numEggs do
+			mem[i][1] = 1;
+			mem[i][0] = 0;
+		end 
+	 
+	 	# We always need j trials for one egg and j floors.
+		for j in 1..numFloors
+			mem[1][j] = j;
+	 	end
+
+		# Fill rest of the entries in table using optimal substructure
+		# property
+		for i in 2..numEggs
+			for j in 2..numFloors
+				mem[i][j] = $MAX
+				for x in 1..j do
+					res = 1 + [mem[i-1][x-1], mem[i][j-x]].max
+					mem[i][j] = res if res < mem[i][j]
+				end
+			end
+		end
+	
+		numFloorsWhenCrushed = chosenFloor - startFloor
+		# Having no eggs when there are floors left is worse
+		return 'crushed' if numFloorsWhenCrushed > 0 && numEggs - 1 == 0
+		
+		maxTrialsWhenCrushed = mem[numEggs-1][numFloorsWhenCrushed]
+		numFloorsWhenNotCrushed = endFloor - chosenFloor
+		maxTrialsWhenNotCrushed = mem[numEggs][numFloorsWhenNotCrushed]
+		if maxTrialsWhenCrushed > maxTrialsWhenNotCrushed
+			return 'crushed'
+		else
+			return 'not crushed'
+		end
+	end
+end
+
+def print_dp_decision_tree_fixed_cost(numFloors, numEggs, ipadCost=5, filename="decision_tree")
+	# A 2D table where entery eggFloor[i][j] will represent minimum
+	#   number of trials needed for i eggs and j floors.
+	mem = []
+	for i in 0..numEggs do
+		mem << []
+		for j in 0..numFloors do
+			mem[i] << { 'cost' => $MAX }
+		end
+	end
+ 
+	# We need one trial for one floor and 0 trials for 0 floors
+	for i in 1..numEggs do
+		mem[i][1] = { 
+			'cost' => 1 + ipadCost, 
+			'crushed_ipad' => 1,
+			'floorsLeft' => 1 
+			};
+		mem[i][0] = { 
+			'cost' => 0,
+			'crushed_ipad' => 0,
+			'floorsLeft' => 0
+			};
+	end 
+ 
+ 	# We always need j trials for one egg and j floors.
+	for j in 1..numFloors
+		mem[1][j] = { 
+			'cost' => j + j * ipadCost,
+			'crushed_ipad' => j ,
+			'floorsLeft' => j
+			};
+ 	end
+
+	# Fill rest of the entries in table using optimal substructure
+	# property
+	for i in 2..numEggs
+		for j in 2..numFloors
+			mem[i][j] = { 'cost' => $MAX }
+			for x in 1..j do
+				if mem[i][j-x]['cost'] >= (mem[i-1][x-1]['cost'] + ipadCost)
+					cost = mem[i][j-x]['cost'] + 1
+					crushed_number = mem[i][j-x]
+				else
+					cost = mem[i-1][x-1]['cost'] + ipadCost + 1
+					crushed_number = mem[i-1][x-1]['crushed_ipad'] + 1
+				end
+				if cost <= mem[i][j]['cost']
+					mem[i][j] = { 
+						'cost' => cost, 
+						'offset' => x, 
+						'crushed' => mem[i-1][x-1], 
+						'not_crushed' => mem[i][j-x],
+						'crushed_ipad' => crushed_number
+						}
+				end
+			end
+		end
+	end
+ 
+	# mem[numEggs][numFloors] holds the result
+	# But need to process the level in the result
+	Node.print(retrieve_node(mem[numEggs][numFloors], 0), filename)	
+	ap mem[numEggs][numFloors]['cost']
+end
+	
+def output_gamestate_crush_status_fixed_cost_ipad(startFloor, endFloor, numEggs, chosenFloor, ipadCost)
+	if chosenFloor < startFloor
+		return 'not crushed'
+	elsif chosenFloor > endFloor
+		return 'crushed'
+	else
+		numFloors = endFloor-startFloor
+		# Calculate dp table
+		# A 2D table where entery eggFloor[i][j] will represent minimum
+		#   number of trials needed for i eggs and j floors.
+		mem = []
+		for i in 0..numEggs do
+			mem << []
+			for j in 0..numFloors do
+				mem[i] << $MAX
+			end
+		end
+	 
+		# We need one trial for one floor and 0 trials for 0 floors
+		for i in 1..numEggs do
+			mem[i][1] = 1+ipadCost;
+			mem[i][0] = 0;
+		end 
+	 
+	 	# We always need j trials for one egg and j floors.
+		for j in 1..numFloors
+			mem[1][j] = j+j*ipadCost;
+	 	end
+
+		# Fill rest of the entries in table using optimal substructure
+		# property
+		for i in 2..numEggs
+			for j in 2..numFloors
+				mem[i][j] = $MAX
+				for x in 1..j do
+					res = 1 + [mem[i-1][x-1]+ipadCost, mem[i][j-x]].max
+					mem[i][j] = res if res < mem[i][j]
+				end
+			end
+		end
+	
+		numFloorsWhenCrushed = chosenFloor - startFloor
+		# Having no eggs when there are floors left is worse
+		return 'crushed' if numFloorsWhenCrushed > 0 && numEggs - 1 == 0
+		
+		maxCostWhenCrushed = mem[numEggs-1][numFloorsWhenCrushed]
+		numFloorsWhenNotCrushed = endFloor - chosenFloor
+		maxCostWhenNotCrushed = mem[numEggs][numFloorsWhenNotCrushed]
+		if maxCostWhenCrushed > maxCostWhenNotCrushed
+			return 'crushed'
+		else
+			return 'not crushed'
+		end
+	end
+end
+
+def print_dp_decision_tree_dynamic_cost(numFloors, numEggs, fun, filename="decision_tree")
+	# A 2D table where entery eggFloor[i][j] will represent minimum
+	#   number of trials needed for i eggs and j floors.
+	mem = []
+	for i in 0..numEggs do
+		mem << []
+		for j in 0..numFloors do
+			mem[i] << { 'cost' => $MAX }
+		end
+	end
+ 
+	# We need one trial for one floor and 0 trials for 0 floors
+	for i in 1..numEggs do
+		mem[i][1] = { 
+			'cost' => 1 + fun.call(1), 
+			'crushed_ipad' => 1,
+			'floorsLeft' => 1 
+			};
+		mem[i][0] = { 
+			'cost' => 0,
+			'crushed_ipad' => 0,
+			'floorsLeft' => 0
+			};
+	end 
+ 
+ 	# We always need j trials for one egg and j floors.
+	for j in 1..numFloors
+		mem[1][j] = { 
+			'cost' => j + (1..j).reduce { |acc, n| acc + fun.call(n) },
+			'crushed_ipad' => j ,
+			'floorsLeft' => j
+			};
+ 	end
+
+	# Fill rest of the entries in table using optimal substructure
+	# property
+	for i in 2..numEggs
+		for j in 2..numFloors
+			mem[i][j] = { 'cost' => $MAX }
+			for x in 1..j do
+				ipadCostWhenCrushed = fun.call(mem[i-1][x-1]['crushed_ipad']+1)
+				if mem[i][j-x]['cost'] >= (mem[i-1][x-1]['cost'] + ipadCostWhenCrushed)
+					cost = mem[i][j-x]['cost'] + 1
+					crushed_number = mem[i][j-x]
+				else
+					cost = mem[i-1][x-1]['cost'] + ipadCostWhenCrushed + 1
+					crushed_number = mem[i-1][x-1]['crushed_ipad'] + 1
+				end
+				if cost <= mem[i][j]['cost']
+					mem[i][j] = { 
+						'cost' => cost, 
+						'offset' => x, 
+						'crushed' => mem[i-1][x-1], 
+						'not_crushed' => mem[i][j-x],
+						'crushed_ipad' => crushed_number
+						}
+				end
+			end
+		end
+	end
+ 
+	# mem[numEggs][numFloors] holds the result
+	# But need to process the level in the result
+	Node.print(retrieve_node(mem[numEggs][numFloors], 0), filename)	
+	ap mem[numEggs][numFloors]['cost']
+end
+
+def output_gamestate_crush_status_dynamic_cost_ipad(startFloor, endFloor, numEggs, chosenFloor, fun)
+	if chosenFloor < startFloor
+		return 'not crushed'
+	elsif chosenFloor > endFloor
+		return 'crushed'
+	else
+		numFloors = endFloor-startFloor
+		# A 2D table where entery eggFloor[i][j] will represent minimum
+		#   number of trials needed for i eggs and j floors.
+		mem = []
+		for i in 0..numEggs do
+			mem << []
+			for j in 0..numFloors do
+				mem[i] << { 'cost' => $MAX }
+			end
+		end
+	 
+		# We need one trial for one floor and 0 trials for 0 floors
+		for i in 1..numEggs do
+			mem[i][1] = { 
+				'cost' => 1 + fun.call(1), 
+				'crushed_ipad' => 1
+				};
+			mem[i][0] = { 
+				'cost' => 0,
+				'crushed_ipad' => 0
+				};
+		end 
+	 
+	 	# We always need j trials for one egg and j floors.
+		for j in 1..numFloors
+			mem[1][j] = { 
+				'cost' => j + (1..j).reduce { |acc, n| acc + fun.call(n) },
+				'crushed_ipad' => j
+				};
+	 	end
+
+		# Fill rest of the entries in table using optimal substructure
+		# property
+		for i in 2..numEggs
+			for j in 2..numFloors
+				mem[i][j] = { 'cost' => $MAX }
+				for x in 1..j do
+					ipadCostWhenCrushed = fun.call(mem[i-1][x-1]['crushed_ipad']+1)
+					if mem[i][j-x]['cost'] >= (mem[i-1][x-1]['cost'] + ipadCostWhenCrushed)
+						cost = mem[i][j-x]['cost'] + 1
+						crushed_number = mem[i][j-x]
+					else
+						cost = mem[i-1][x-1]['cost'] + ipadCostWhenCrushed + 1
+						crushed_number = mem[i-1][x-1]['crushed_ipad'] + 1
+					end
+					if cost <= mem[i][j]['cost']
+						mem[i][j] = { 
+							'cost' => cost,
+							'crushed_ipad' => crushed_number
+							}
+					end
+				end
+			end
+		end
+	 
+		# mem[numEggs][numFloors] holds the result
+		# But need to process the level in the result
+		
+		# Having no eggs when there are floors left is worse
+		numFloorsWhenCrushed = chosenFloor - startFloor
+		return 'crushed' if numFloorsWhenCrushed > 0 && numEggs - 1 == 0
+		maxCostWhenCrushed = mem[numEggs-1][numFloorsWhenCrushed]['cost']
+		numFloorsWhenNotCrushed = endFloor - chosenFloor
+		maxCostWhenNotCrushed = mem[numEggs][numFloorsWhenNotCrushed]['cost']
+		if maxCostWhenCrushed > maxCostWhenNotCrushed
+			return 'crushed'
+		else
+			return 'not crushed'
+		end
+	end
+end
+
+sample_fun = Proc.new do |numIpad|
+	numIpad * 5
+end
+
+ap(output_gamestate_crush_status(1, 100, 2, 30))
