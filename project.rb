@@ -165,6 +165,7 @@ def print_decision_tree(numFloors, numEggs, filename="decision_tree")
 	Node.print(output_decision_tree(numFloors, numEggs, 0)['root'], filename)
 end
 
+
 def max_trials_dp(numFloors, numEggs)
 	# A 2D table where entery eggFloor[i][j] will represent minimum
 	#   number of trials needed for i eggs and j floors.
@@ -309,7 +310,7 @@ def print_dp_decision_tree(numFloors, numEggs, filename="decision_tree")
 			for x in 1..j do
 				cost = [mem[i][j-x]['cost'], mem[i-1][x-1]['cost']].max + 1
 				
-				if cost <= mem[i][j]['cost']
+				if cost < mem[i][j]['cost']
 					mem[i][j] = { 'cost' => cost, 
 					'offset' => x, 'crushed' => mem[i-1][x-1], 'not_crushed' => mem[i][j-x]}
 				end
@@ -336,6 +337,8 @@ def retrieve_node(table_node, curOffset)
 		node
 	end
 end
+
+#print_dp_decision_tree(30, 2, "decision_tree_alt")
 
 def output_gamestate_crush_status(startFloor, endFloor, numEggs, chosenFloor)
 	if chosenFloor < startFloor
@@ -404,7 +407,7 @@ def print_dp_decision_tree_fixed_cost(numFloors, numEggs, ipadCost=5, filename="
 		end
 	end
  
-	# We need one trial for one floor and 0 trials for 0 floors
+	# We need one trial and one egg crushed for one floor and 0 trials for 0 floors,
 	for i in 1..numEggs do
 		mem[i][1] = { 
 			'cost' => 1 + ipadCost, 
@@ -418,11 +421,11 @@ def print_dp_decision_tree_fixed_cost(numFloors, numEggs, ipadCost=5, filename="
 			};
 	end 
  
- 	# We always need j trials for one egg and j floors.
+ 	# We always need j trials and one egg crushed for one egg and j floors
 	for j in 1..numFloors
 		mem[1][j] = { 
-			'cost' => j + j * ipadCost,
-			'crushed_ipad' => j ,
+			'cost' => j + ipadCost,
+			'crushed_ipad' => 1,
 			'floorsLeft' => j
 			};
  	end
@@ -458,6 +461,45 @@ def print_dp_decision_tree_fixed_cost(numFloors, numEggs, ipadCost=5, filename="
 	Node.print(retrieve_node(mem[numEggs][numFloors], 0), filename)	
 	ap mem[numEggs][numFloors]['cost']
 end
+
+print_dp_decision_tree_fixed_cost(100, 2)
+
+def dp_cost_table_fixed_cost_ipad(numFloors, numEggs, ipadCost)
+	# Calculate dp table
+	# A 2D table where entery eggFloor[i][j] will represent minimum
+	#   number of trials needed for i eggs and j floors.
+	mem = []
+	for i in 0..numEggs do
+		mem << []
+		for j in 0..numFloors do
+			mem[i] << $MAX
+		end
+	end
+ 
+	# We need one trial for one floor and 0 trials for 0 floors
+	for i in 1..numEggs do
+		mem[i][1] = 1+ipadCost;
+		mem[i][0] = 0;
+	end 
+ 
+ 	# We always need j trials for one egg and j floors.
+	for j in 1..numFloors
+		mem[1][j] = j+ipadCost;
+ 	end
+
+	# Fill rest of the entries in table using optimal substructure
+	# property
+	for i in 2..numEggs
+		for j in 2..numFloors
+			mem[i][j] = $MAX
+			for x in 1..j do
+				res = 1 + [mem[i-1][x-1]+ipadCost, mem[i][j-x]].max
+				mem[i][j] = res if res < mem[i][j]
+			end
+		end
+	end
+	mem
+end	
 	
 def output_gamestate_crush_status_fixed_cost_ipad(startFloor, endFloor, numEggs, chosenFloor, ipadCost)
 	if chosenFloor < startFloor
@@ -485,7 +527,7 @@ def output_gamestate_crush_status_fixed_cost_ipad(startFloor, endFloor, numEggs,
 	 
 	 	# We always need j trials for one egg and j floors.
 		for j in 1..numFloors
-			mem[1][j] = j+j*ipadCost;
+			mem[1][j] = j+ipadCost;
 	 	end
 
 		# Fill rest of the entries in table using optimal substructure
@@ -526,7 +568,7 @@ def print_dp_decision_tree_dynamic_cost(numFloors, numEggs, fun, filename="decis
 		end
 	end
  
-	# We need one trial for one floor and 0 trials for 0 floors
+	# We need one trial, one egg crushed, for one floor and 0 trials for 0 floors
 	for i in 1..numEggs do
 		mem[i][1] = { 
 			'cost' => 1 + fun.call(1), 
@@ -540,11 +582,11 @@ def print_dp_decision_tree_dynamic_cost(numFloors, numEggs, fun, filename="decis
 			};
 	end 
  
- 	# We always need j trials for one egg and j floors.
+ 	# We always need j trials, one egg crushed, for one egg and j floors.
 	for j in 1..numFloors
 		mem[1][j] = { 
-			'cost' => j + (1..j).reduce { |acc, n| acc + fun.call(n) },
-			'crushed_ipad' => j ,
+			'cost' => j + fun.call(1),
+			'crushed_ipad' => 1 ,
 			'floorsLeft' => j
 			};
  	end
@@ -614,8 +656,8 @@ def output_gamestate_crush_status_dynamic_cost_ipad(startFloor, endFloor, numEgg
 	 	# We always need j trials for one egg and j floors.
 		for j in 1..numFloors
 			mem[1][j] = { 
-				'cost' => j + (1..j).reduce { |acc, n| acc + fun.call(n) },
-				'crushed_ipad' => j
+				'cost' => j + fun.call(1),
+				'crushed_ipad' => 1
 				};
 	 	end
 
@@ -664,4 +706,21 @@ sample_fun = Proc.new do |numIpad|
 	numIpad * 5
 end
 
-ap(output_gamestate_crush_status(1, 100, 2, 30))
+print_dp_decision_tree_dynamic_cost(100, 2, sample_fun)
+
+#ap(output_gamestate_crush_status(1, 100, 2, 30))
+
+#for i in 0..10
+#	tbl = dp_cost_table_fixed_cost_ipad(100, 4, i)
+#	print "Fixed Ipad Cost = #{i}\n"
+#	for j in 1..4
+#		print "Number of eggs = #{j}\n"
+#		for k in 0..100
+#			print " #{tbl[j][k]}"
+#		end
+#		print "\n"
+#	end
+#	print "\n"
+#end
+
+# Draw graph
